@@ -1,0 +1,47 @@
+name: Daily Data Extraction
+
+on:
+  schedule:
+    # Ejecutar todos los días a las 2:00 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:  # Permite ejecución manual
+
+jobs:
+  extract-data:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run data extraction
+      env:
+        FOOTBALL_API_KEY: ${{ secrets.FOOTBALL_API_KEY }}
+      run: |
+        python -m src.data_extraction
+        
+    - name: Commit and push data
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add data/raw/
+        git diff --staged --quiet || git commit -m "Daily data extraction - $(date +'%Y-%m-%d')"
+        git push
